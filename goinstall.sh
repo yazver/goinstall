@@ -17,9 +17,6 @@ case `uname -m` in
     *arm64) arch="arm64" ;;
 esac
 
-filename="go$version.$os-$arch.tar.gz"
-echo "Will be installed \"$filename\""
-
 dest="/usr/local"
 goroot="$dest/go"
 gopath="$HOME/dev/go"
@@ -28,20 +25,61 @@ if [[ -n "$SHELL" ]] && [[ $(basename "$SHELL") == "zsh" ]]; then
     profile="$HOME/.zshrc"
 fi
 
-if [ "$1" == "--remove" ]; then
-    rm -rf "$goroot"
-    sed -i '/export GOROOT/d' "$profile"
-    sed -i "/:$goroot/d" "$profile"
-    sed -i '/export GOPATH/d' "$profile}"
-    sed -i "/:$gopath/d" "$profile"
-    echo "Go removed."
-    exit 0
-fi
-
 if [ ! -w "$dest" ]; then
     echo "Not enough rights to write to the directory: $dest"
     exit 1
 fi
+
+#Process arguments
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -h|--help) 
+            exit 0 ;;    
+        -v|--version)
+            version="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        -a|--arch)
+            arch="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        -a32|--arch32)
+            arch="386"
+            shift # past argument
+            ;;    
+        -a64|--arch64)
+            arch="amd64"
+            shift # past argument
+            ;;
+        -o|--os)
+            os="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        -r|--remove)
+            rm -rf "$goroot"
+            sed -i '/export GOROOT/d' "$profile"
+            sed -i '\|:'$goroot'|d' "$profile"
+            sed -i '/export GOPATH/d' "$profile"
+            sed -i '\|:'$gopath'|d' "$profile"
+            echo "Go removed."
+            exit
+            ;;
+        *)  # unknown option
+            POSITIONAL+=("$1") # save it in an array for later
+            shift # past argument
+            ;;
+esac
+done
+set -- "${POSITIONAL[@]}" # restore positional parameters
+
+filename="go$version.$os-$arch.tar.gz"
+echo "Will be installed \"$filename\""
+
 if [ -d "$goroot" ]; then
  read -p "Directory $goroot exist. Remove it and continue (y/n)?" -n 1 -r
  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -62,6 +100,8 @@ tar -C /usr/local -xzf "/tmp/$filename" --totals
 rm -f /tmp/$filename
 
 echo "Set envirinment:"
+echo '#go language' >> "$profile"
+
 add_path() {
     if [ -s "$1" ] && [[ ":$PATH:" != *":$1:"* ]]; then
         echo "  Add \"$1\" to PATH"  
